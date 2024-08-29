@@ -280,6 +280,7 @@ class Minesweeper {
    * Check adjacent cells for mines
    * @param {number} row - The row of the cell
    * @param {number} col - The column of the cell
+   * @returns {number} The number of mines adjacent to this cell
    */
   checkAdjacentMines(row, col) {
     let count = 0;
@@ -295,15 +296,18 @@ class Minesweeper {
       }
     }
 
-    this.board[row][col].setAdjMineCount(count);
+    return count;
   }
 
+  /**
+   * Set the adjacent mine count for all the cells
+   */
   setCellVals() {
     for (let row of this.board) {
       for (let cell of row) {
         if (cell.isMine) continue;
 
-        this.checkAdjacentMines(cell.row, cell.col);
+        cell.adjMineCount = this.checkAdjacentMines(cell.row, cell.col);
       }
     }
   }
@@ -327,6 +331,9 @@ class Minesweeper {
     }
   }
 
+  /**
+   * Check if this cell meets the requirements to open its neighbors
+   */
   canOpenAdjacentCells(row, col) {
     return this.board[row][col].isOpen &&
       !this.board[row][col].isFlagged &&
@@ -369,6 +376,9 @@ class Minesweeper {
     return col >= 0 && col < this.cols;
   }
 
+  /**
+   * Reveal all mine cells
+   */
   revealAllMines() {
     this.disableAllCells();
     for (let row of this.board) {
@@ -453,14 +463,14 @@ class Minesweeper {
     return numClosed === numMines;
   }
 
+  /**
+   * Set the end-of-game state
+   */
   onGameOver() {
     console.debug("Game over!");
     for (let row of this.board) {
       for (let cell of row) {
-        // DOES NOT WORK
-        cell.ref.addEventListener("click", (e) => e.preventDefault());
-        cell.ref.addEventListener("mousedown", (e) => e.preventDefault());
-        cell.ref.addEventListener("mouseup", (e) => e.preventDefault());
+        cell.setAttribute('class', "no-click");
       }
     }
   }

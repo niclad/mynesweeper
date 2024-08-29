@@ -128,4 +128,6 @@ header {
   box-shadow: inset 0px -5px 0px 0px #4b4b4b,  inset 0px 5px 0px 0px #ffffff;
 }
 
-
+.no-click {
+  pointer-events: none;
+}
