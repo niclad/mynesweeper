@@ -103,7 +103,6 @@ function buildBoard() {
     for (let j = 0; j < cols; j++) {
       let cell = document.createElement("div");
       cell = setCellClass(i, j, cell);
-      // cell.innerHTML = `${i},${j}`;
 
       row.appendChild(cell);
     }
@@ -223,8 +222,6 @@ function saveDifficulty(difficulty) {
 
 document.addEventListener("DOMContentLoaded", () => {
   setUIDifficulty();
-  const { rows, cols, mines } = DIFFICULTY_SETTINGS[selected];
-  game = new Minesweeper(rows, cols, mines);
 });
 
 function setUIDifficulty() {
@@ -233,6 +230,12 @@ function setUIDifficulty() {
 }
 
 class Minesweeper {
+  rows;
+  cols;
+  mines;
+  board;
+  numFlags = 0;
+  
   constructor(rows, cols, mines) {
     this.rows = rows;
     this.cols = cols;
@@ -242,6 +245,9 @@ class Minesweeper {
     this.setCellVals();
   }
 
+  /**
+   * Initialize the cells for the playable gameboard
+   */
   createBoard() {
     let board = [];
     for (let i = 0; i < this.rows; i++) {
@@ -254,19 +260,14 @@ class Minesweeper {
     return board;
   }
 
+  /**
+   * Place the mines under random cells
+   */
   placeMines() {
     let minesPlaced = [];
-    let tempX = 0;
-    let tempY = 0;
     while (minesPlaced.length < this.mines) {
-      // let row = Math.floor(Math.random() * this.rows);
-      // let col = Math.floor(Math.random() * this.cols);
-      let row = tempX++;
-      let col = tempY++;
-      if (tempX === this.rows) {
-        tempX = 0;
-        tempY = 1;
-      }
+      let row = Math.floor(Math.random() * this.rows);
+      let col = Math.floor(Math.random() * this.cols);
 
       if (!minesPlaced.includes(`${row}-${col}`)) {
         minesPlaced.push(`${row}-${col}`);
@@ -274,28 +275,18 @@ class Minesweeper {
       }
     }
   }
-
-  updateHTML() {
-    const closedCells = document.querySelectorAll(".closed");
-    for (let cell of closedCells) {
-      const id = cell.getAttribute("id");
-      const [row, col] = id.split("-").map(Number);
-      const cellObj = this.board[row][col];
-      if (cellObj.isOpen) {
-        cell.setAttribute("class", `cell open${cellObj.adjMineCount}`);
-        if (cellObj.isMine) {
-          cell.innerHTML = "💣";
-        } else if (cellObj.adjMineCount > 0) {
-          cell.innerHTML = cellObj.adjMineCount;
-        }
-      }
-    }
-  }
-
-  checkAdjacentCells(row, col) {
+  
+  /**
+   * Check adjacent cells for mines
+   * @param {number} row - The row of the cell
+   * @param {number} col - The column of the cell
+   */
+  checkAdjacentMines(row, col) {
     let count = 0;
     for (let i = row - 1; i <= row + 1; i++) {
+      if (!this.isInRowLimit(i)) continue;
       for (let j = col - 1; j <= col + 1; j++) {
+        if (!this.isInColLimit(j))
         if (i === row && j === col) continue;
 
         if (this.board[i] && this.board[i][j] && this.board[i][j].isMine) {
@@ -312,58 +303,164 @@ class Minesweeper {
       for (let cell of row) {
         if (cell.isMine) continue;
 
-        this.checkAdjacentCells(cell.row, cell.col);
+        this.checkAdjacentMines(cell.row, cell.col);
       }
     }
   }
 
-  middleClickOpen(row, col) {
+  /**
+   * Open the cells adjacent to the given cell
+   * @param {number} row 
+   * @param {number} col 
+   */
+  openAdjacentCells(row, col) {
+    // verify the surrounding cells can be opened
+    if (!this.canOpenAdjacentCells(row, col)) return;
+
     for (let i = row - 1; i <= row + 1; i++) {
+      if (!this.isInRowLimit(i)) continue;
       for (let j = col - 1; j <= col + 1; j++) {
+        if (!this.isInColLimit(j)) continue;
         if (this.board[i][j].isFlagged) continue;
-        this.board[i][j].setOpen();
+        this.board[i][j].setOpen(true);
       }
     }
+  }
+
+  canOpenAdjacentCells(row, col) {
+    return this.board[row][col].isOpen &&
+      !this.board[row][col].isFlagged &&
+      this.countAdjFlags(row, col) === this.board[row][col].adjMineCount;
+  }
+
+  /**
+   * Count the number of adjacent flags
+   * @param {number} row - The row index
+   * @param {number} col - The column index
+   * @returns {number} - The number of adjacent flags
+   */
+  countAdjFlags(row, col) {
+    let count = 0;
+    for (let i = row - 1; i <= row + 1; i++) {
+      if (!this.isInRowLimit(i)) continue;
+      for (let j = col - 1; j <= col + 1; j++) {
+        if (!this.isInColLimit(j)) continue;
+        if (this.board[i][j].isFlagged) count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Check if the row is in the board limits
+   * @param {number} row - The row index
+   * @returns {boolean} - If the row is in the board limits
+   */
+  isInRowLimit(row) {
+    return row >= 0 && row < this.rows;
+  }
+
+  /**
+   * Check if the column is in the board limits
+   * @param {number} col - The column index
+   * @returns {boolean} - If the column is in the board limits
+   */
+  isInColLimit(col) {
+    return col >= 0 && col < this.cols;
   }
 
   revealAllMines() {
+    this.disableAllCells();
     for (let row of this.board) {
       for (let cell of row) {
-        if (cell.isMine) {
+        if (cell.isMine && !cell.isOpen) {
           cell.setOpen();
         }
       }
     }
+    this.onGameOver();
+    alert("Game over! 💥");
   }
 
-  disbaleAllCells() {
+  disableAllCells() {
     for (let row of this.board) {
       for (let cell of row) {
-        cell.unsetHanlers();
+        cell.removeHandlers();
       }
     }
   }
 
   /**
    * Open the adjacent cells until a cell with adjacent mines is found.
+   * (Flood Fill algorithm)
    * @param {number} row
    * @param {number} col
    */
-  openAdjacentCells(row, col) {
-    for (let i = row - 1; i <= row + 1; i++) {
-      if (i < 0 || i >= this.rows) continue;
-      for (let j = col - 1; j <= col + 1; j++) {
-        if (j < 0 || j >= this.cols) continue;
-        if (i === row && j === col) continue;
+  floodFillCells(row, col) {
+    const cellQueue = [];
+    cellQueue.push(this.board[row][col]);
+    while (cellQueue.length > 0) {
+      const cell = cellQueue.shift();
+      const { row, col } = cell;
+      if (cell.adjMineCount > 0) {
+        cell.setOpen();
+        continue;
+      }
 
-        if (i === row || j === col) {
-          if (!this.board[i][j].isMine && !this.board[i][j].isOpen) {
-            this.board[i][j].setOpen(false);
-            if (this.board[i][j].adjMineCount === 0) {
-              this.openAdjacentCells(i, j);
-            }
+      for (let i = row - 1; i <= row + 1; i++) {
+        for (let j = col - 1; j <= col + 1; j++) {
+          if (i === row && j === col) continue;
+          if (this.board[i] && this.board[i][j] && !this.board[i][j].isOpen) {
+            cellQueue.push(this.board[i][j]);
+            this.board[i][j].setOpen();
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Get the cell with the given id
+   * @param {string} id 
+   * @returns {Cell} - The cell at the given id
+   */
+  getCell(id) {
+    const [row, col] = id.split("-").map(Number);
+    return this.board[row][col];
+  }
+
+  /**
+   * Adjust the flag count
+   * @param {boolean} inc - If the flag count should be incremented
+   */
+  incFlags(inc) {
+    if (inc) {
+      this.numFlags++;
+    } else {
+      this.numFlags--;
+    }
+  }
+
+  /**
+   * Check if the game is won
+   * @returns {boolean} - If the game is won
+   */
+  checkWin() {
+    let closedCells = document.querySelectorAll(".closed");
+    let numClosed = closedCells.length;
+    let numMines = this.mines;
+
+    return numClosed === numMines;
+  }
+
+  onGameOver() {
+    console.debug("Game over!");
+    for (let row of this.board) {
+      for (let cell of row) {
+        // DOES NOT WORK
+        cell.ref.addEventListener("click", (e) => e.preventDefault());
+        cell.ref.addEventListener("mousedown", (e) => e.preventDefault());
+        cell.ref.addEventListener("mouseup", (e) => e.preventDefault());
       }
     }
   }
@@ -376,60 +473,105 @@ class Cell {
   adjMineCount;
   isOpen;
   isFlagged;
-  cellRef;
+  ref;
 
   constructor(row, col) {
     this.row = row;
     this.col = col;
     this.isOpen = false;
     this.isFlagged = false;
-    this.cellRef = document.getElementById(`${row}-${col}`);
+    this.ref = document.getElementById(`${row}-${col}`);
     this.setHandlers();
   }
 
+  /**
+   * Set this cell as a mine.
+   */
   setMine() {
     this.isMine = true;
   }
 
+  /**
+   * Set a flag on this cell.
+   */
   setFlag() {
     if (this.isOpen) return;
 
     this.isFlagged = !this.isFlagged;
 
+    
     if (this.isFlagged) {
-      this.cellRef.innerHTML = "🚩";
+      const valTextSpan = document.createElement("span");
+      valTextSpan.setAttribute("class", "val-text");
+      valTextSpan.innerHTML = "🚩";
+      this.ref.appendChild(valTextSpan);
     } else {
-      this.cellRef.innerHTML = "";
+      this.ref.removeChild(this.ref.childNodes[0]);
     }
+
+    game.incFlags(this.isFlagged);
   }
 
+  /**
+   * Open this cell
+   * @param {boolean} isClicked - if this cell was clicked
+   */
   setOpen(isClicked = false) {
+    if (!this.isOpen) {
+      this.setInnerText();
+    }
+
     this.isOpen = true;
 
     if (this.isMine) {
-      this.cellRef.setAttribute(
-        "class",
-        `cell open${isClicked ? " bomb-clicked" : ""}`
-      );
-      this.cellRef.innerHTML = "💣";
-
-      // game over
-      if (isClicked) {
-        game.revealAllMines();
-      }
-
+      this.handleMine(isClicked);
       return;
     }
 
-    this.cellRef.setAttribute("class", `cell open open${this.adjMineCount}`);
-    if (this.adjMineCount > 0) {
-      this.cellRef.innerHTML = this.adjMineCount;
-    }
+    this.ref.setAttribute("class", `cell open open${this.adjMineCount}`);
 
     if (isClicked && this.adjMineCount === 0) {
-      console.debug('here');
-      game.openAdjacentCells(this.row, this.col);
+      game.floodFillCells(this.row, this.col);
     }
+
+    if (game.checkWin()) {
+      game.onGameOver();
+      alert("You win! 🎉");
+    }
+  }
+
+  /**
+   * Handle the cell being a mine
+   * @param {boolean} isClicked - if this mine was clicked
+   */
+  handleMine(isClicked) {
+    this.ref.setAttribute(
+      "class",
+      `cell open${isClicked ? " bomb-clicked" : ""}`
+    );
+
+    console.debug(this.ref);
+
+    // game over
+    if (isClicked) {
+      game.revealAllMines();
+    }
+  }
+
+  /**
+   * Set the inner text of the cell.
+   */
+  setInnerText() {
+    const valTextSpan = document.createElement("span");
+    valTextSpan.setAttribute("class", "val-text");
+    
+    if (this.isMine) {
+      valTextSpan.innerHTML = "💣";
+    } else if (this.adjMineCount > 0) {
+      valTextSpan.innerHTML = this.adjMineCount;
+    }
+
+    this.ref.appendChild(valTextSpan);
   }
 
   setAdjMineCount(count) {
@@ -437,34 +579,43 @@ class Cell {
   }
 
   setHandlers() {
-    this.cellRef.addEventListener("mouseup", (e) => {
-      if (e.button === 2) {
-        this.setFlag();
-      }
-
-      if (this.isFlagged) {
-        return;
-      }
-
-      if (e.button === 0) {
-        this.setOpen(true);
-      }
-
-      if (e.button === 1) {
-        game.middleClickOpen(this.row, this.col);
-      }
-
-      game.updateHTML();
-    });
-
-    this.cellRef.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-    });
+    this.ref.addEventListener("mouseup", this.mouseUpHandler.bind(this));
+    this.ref.addEventListener("contextmenu", this.contextMenuHandler);
   }
 
-  unsetHanlers() {
-    this.cellRef.removeEventListener("mouseup", () => {});
-    this.cellRef.removeEventListener("contextmenu", () => {});
+  removeHandlers() {
+    this.ref.removeEventListener("mouseup", this.mouseUpHandler);
+  }
+
+  /**
+   * Handle mouse up event.
+   * @param {MouseEvent} e 
+   */
+  mouseUpHandler(e) {
+    e.preventDefault();
+    if (e.button === 2) {
+      this.setFlag();
+    }
+
+    if (e.button === 1) {
+      game.openAdjacentCells(this.row, this.col);
+    }
+    
+    if (this.isFlagged) {
+      return;
+    }
+
+    if (e.button === 0) {
+      this.setOpen(true);
+    }
+  }
+
+  /**
+   * Handle when the right mouse button is clicked.
+   * @param {MouseEvent} e - The mouse event 
+   */
+  contextMenuHandler(e) {
+    e.preventDefault();
   }
 }
 

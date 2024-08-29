@@ -39,6 +39,7 @@ header {
   width: 352px;
   border: 3px solid black;
   user-select: none;
+  flex-shrink: 0;
 }
 
 .cell {
@@ -47,6 +48,8 @@ header {
   /* box-sizing: border-box;
   border: 1px solid #0d6efd; */
   float: left;
+  text-align: center;
+  line-height: 32px;
 }
 
 .v-border,
@@ -74,7 +77,11 @@ header {
   box-sizing: border-box;
   box-shadow: inset 2px 2px 0px 0px #4B4B4B;
   font-weight: bold;
-  text-align: center;
+}
+
+.val-text {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .open1 {
