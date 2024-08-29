@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mynesweeper</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <link rel="icon" href="public/favicon.png" />
+  </head>
+
+  <body>
+    <header>
+      <h1><i>My</i>nesweeper</h1>
+      <div id="menu">
+        <button
+          id="easy"
+          class="btn selected"
+          title="9x9, 10 mines"
+          onclick="setSelected(this)"
+        >
+          Easy
+        </button>
+        <button
+          id="medium"
+          class="btn"
+          title="16x16, 40 mines"
+          onclick="setSelected(this)"
+        >
+          Medium
+        </button>
+        <button
+          id="hard"
+          class="btn"
+          title="16x30, 99 mines"
+          onclick="setSelected(this)"
+        >
+          Hard
+        </button>
+      </div>
+    </header>
+    <div class="content">
+      <div id="board" oncontextmenu="return false;" ondrag="return false;" ondragstart="return false;">
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
