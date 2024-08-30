@@ -64,7 +64,15 @@ header {
 }
 
 .time {
-  background-color: red;
+  background-color: black;
+}
+
+.time .val-text {
+  color: red;
+  font-weight: bold;
+  font-family: monospace;
+  font-size: 1.5rem;
+  /* text-shadow: 0px 0px 3px red; */
 }
 
 .closed {
@@ -77,6 +85,10 @@ header {
   box-sizing: border-box;
   box-shadow: inset 2px 2px 0px 0px #4B4B4B;
   font-weight: bold;
+}
+
+.spacer {
+  background-color: silver;
 }
 
 .val-text {

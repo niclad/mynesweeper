@@ -1,3 +1,25 @@
+/**
+ * Minesweeper game
+ * @file app.js
+ * @version 1.0.0
+ * @since 1.0.0
+ * @description The Minesweeper game
+ * @license MIT
+ * @see
+ * - [Minesweeper](https://en.wikipedia.org/wiki/Minesweeper_(video_game))
+ * - [Flood Fill Algorithm](https://en.wikipedia.org/wiki/Flood_fill)
+ *
+ * @todo
+ * - Add a timer
+ * - Add a reset button
+ * - Add a settings button
+ * - Add a game over screen
+ * - Add a win screen
+ * - Add a flag/mine counter
+ * - Possibly calculate the cell's values when they are clicked
+ *   - (should kind of obfuscate the board a bit more)
+ */
+
 /** Settings for a hard game */
 const HARD_SETTINGS = {
   rows: 16,
@@ -176,14 +198,85 @@ function setCellClass(row, col, cell) {
   // handling timer...
   const timeRow = topRow + 1;
   if (row === timeRow) {
-    cell.setAttribute("class", "cell time");
-    return cell;
+    return buildTimeRow(col, cell);
   }
 
   // handle all others
   cell.setAttribute("class", "cell closed");
   const id = `${row - (middleRow + 1)}-${col - (leftCol + 1)}`;
   cell.setAttribute("id", id);
+  return cell;
+}
+
+/**
+ * Set the class on the row element.
+ * @param {number} col - The column index
+ * @returns {HTMLDivElement} The time row cell element
+ */
+function buildTimeRow(col, cell) {
+  const { cols: boardWidth } = calculateFullBoardSize();
+  const minesHundreds = 1;
+  const minesTens = 2;
+  const minesOnes = 3;
+  const timeHundreds = boardWidth - 4;
+  const timeTens = boardWidth - 3;
+  const timeOnes = boardWidth - 2;
+  const gameBtn = Math.floor(boardWidth / 2);
+
+  const valTextSpan = document.createElement("span");
+  valTextSpan.setAttribute("class", "val-text");
+  cell.appendChild(valTextSpan);
+
+  const mines = DIFFICULTY_SETTINGS[selected].mines;
+
+  if (col === minesHundreds) {
+    cell.setAttribute("class", "mines-hundreds time");
+    const numHundreds = Math.floor(mines / 100);
+    cell.childNodes[0].innerHTML = numHundreds;
+  }
+
+  if (col === minesTens) {
+    cell.setAttribute("class", "mines-tens time");
+    const numTens = Math.floor(mines / 10) % 10;
+    cell.childNodes[0].innerHTML = numTens;
+  }
+
+  if (col === minesOnes) {
+    cell.setAttribute("class", "mines-ones time");
+    const numOnes = mines % 10;
+    cell.childNodes[0].innerHTML = numOnes;
+  }
+
+  if (col === timeHundreds) {
+    cell.setAttribute("class", "time-hundreds time");
+    const numHundreds = 0;
+    cell.childNodes[0].innerHTML = numHundreds;
+  }
+
+  if (col === timeTens) {
+    cell.setAttribute("class", "time-tens time");
+    const numTens = 0;
+    cell.childNodes[0].innerHTML = numTens;
+  }
+
+  if (col === timeOnes) {
+    cell.setAttribute("class", "time-ones time");
+    const numOnes = 0;
+    cell.childNodes[0].innerHTML = numOnes;
+  }
+
+  if (col === gameBtn) {
+    cell.setAttribute("class", "game-btn closed");
+    cell.innerHTML = "😃";
+  }
+
+  let currClass = cell.getAttribute("class");
+  if (currClass === null) {
+    currClass = "spacer";
+  }
+
+  cell.setAttribute("class", `cell  ${currClass}`);
+
   return cell;
 }
 
@@ -230,12 +323,27 @@ function setUIDifficulty() {
 }
 
 class Minesweeper {
+  /** @type {number} */
   rows;
+
+  /** @type {number} */
   cols;
+
+  /** @type {number} */
   mines;
+
+  /** @type {Cell[][]} */
   board;
+
+  /** @type {number} */
   numFlags = 0;
-  
+
+  /** @type {TimeRow} Time row control */
+  timeRow;
+
+  /** @type {boolean} */
+  isRunning = false;
+
   constructor(rows, cols, mines) {
     this.rows = rows;
     this.cols = cols;
@@ -243,6 +351,7 @@ class Minesweeper {
     this.board = this.createBoard();
     this.placeMines();
     this.setCellVals();
+    this.timeRow = new TimeRow();
   }
 
   /**
@@ -275,7 +384,7 @@ class Minesweeper {
       }
     }
   }
-  
+
   /**
    * Check adjacent cells for mines
    * @param {number} row - The row of the cell
@@ -287,8 +396,7 @@ class Minesweeper {
     for (let i = row - 1; i <= row + 1; i++) {
       if (!this.isInRowLimit(i)) continue;
       for (let j = col - 1; j <= col + 1; j++) {
-        if (!this.isInColLimit(j))
-        if (i === row && j === col) continue;
+        if (!this.isInColLimit(j)) if (i === row && j === col) continue;
 
         if (this.board[i] && this.board[i][j] && this.board[i][j].isMine) {
           count++;
@@ -314,8 +422,8 @@ class Minesweeper {
 
   /**
    * Open the cells adjacent to the given cell
-   * @param {number} row 
-   * @param {number} col 
+   * @param {number} row
+   * @param {number} col
    */
   openAdjacentCells(row, col) {
     // verify the surrounding cells can be opened
@@ -335,9 +443,11 @@ class Minesweeper {
    * Check if this cell meets the requirements to open its neighbors
    */
   canOpenAdjacentCells(row, col) {
-    return this.board[row][col].isOpen &&
+    return (
+      this.board[row][col].isOpen &&
       !this.board[row][col].isFlagged &&
-      this.countAdjFlags(row, col) === this.board[row][col].adjMineCount;
+      this.countAdjFlags(row, col) === this.board[row][col].adjMineCount
+    );
   }
 
   /**
@@ -380,7 +490,6 @@ class Minesweeper {
    * Reveal all mine cells
    */
   revealAllMines() {
-    this.disableAllCells();
     for (let row of this.board) {
       for (let cell of row) {
         if (cell.isMine && !cell.isOpen) {
@@ -389,7 +498,6 @@ class Minesweeper {
       }
     }
     this.onGameOver();
-    alert("Game over! 💥");
   }
 
   disableAllCells() {
@@ -431,7 +539,7 @@ class Minesweeper {
 
   /**
    * Get the cell with the given id
-   * @param {string} id 
+   * @param {string} id
    * @returns {Cell} - The cell at the given id
    */
   getCell(id) {
@@ -449,6 +557,8 @@ class Minesweeper {
     } else {
       this.numFlags--;
     }
+
+    this.timeRow.setMines(this.mines - this.numFlags);
   }
 
   /**
@@ -457,32 +567,86 @@ class Minesweeper {
    */
   checkWin() {
     let closedCells = document.querySelectorAll(".closed");
-    let numClosed = closedCells.length;
-    let numMines = this.mines;
+    const numClosed = closedCells.length;
 
-    return numClosed === numMines;
+    return numClosed === this.mines && this.numFlags === this.mines;
   }
 
   /**
-   * Set the end-of-game state
+   * Set the end-of-game state, regardless of win or loss.
    */
   onGameOver() {
+    this.isRunning = false;
+
     console.debug("Game over!");
     for (let row of this.board) {
       for (let cell of row) {
-        cell.setAttribute('class', "no-click");
+        const currClass = cell.ref.getAttribute("class");
+        cell.ref.setAttribute("class", `${currClass} no-click`);
+      }
+    }
+
+    if (this.checkWin()) {
+      console.debug("You win!");
+      this.timeRow.setFace("😎");
+    } else {
+      console.debug("You lose!");
+      this.timeRow.setFace("💀");
+    }
+  }
+
+  /**
+   * Press the neighbors of the given cell
+   * @param {number} row
+   * @param {number} col
+   */
+  pressNeighbors(row, col) {
+    for (let i = row - 1; i <= row + 1; i++) {
+      if (!this.isInRowLimit(i)) continue;
+      for (let j = col - 1; j <= col + 1; j++) {
+        if (!this.isInColLimit(j)) continue;
+        const cell = this.board[i][j];
+        if (!cell.isOpen && !cell.isFlagged) {
+          cell.open();
+        }
+      }
+    }
+  }
+
+  closeNeighbors(row, col) {
+    for (let i = row - 1; i <= row + 1; i++) {
+      if (!this.isInRowLimit(i)) continue;
+      for (let j = col - 1; j <= col + 1; j++) {
+        if (!this.isInColLimit(j)) continue;
+        const cell = this.board[i][j];
+        if (!cell.isOpen && !cell.isFlagged) {
+          cell.close();
+        }
       }
     }
   }
 }
 
 class Cell {
+  /** @type {number} Row location */
   row;
+
+  /** @type {number} Column location (or the location in row) */
   col;
+
+  /** @type {boolean} Mine state */
   isMine;
+
+  /** @type {number} Mines directly adjacent to this cell */
   adjMineCount;
+
+  /** @type {boolean} Open state */
   isOpen;
+
+  /** @type {boolean} Flag state */
   isFlagged;
+
+  /** @type {HTMLElement} Reference to the cell in the DOM  */
   ref;
 
   constructor(row, col) {
@@ -509,7 +673,6 @@ class Cell {
 
     this.isFlagged = !this.isFlagged;
 
-    
     if (this.isFlagged) {
       const valTextSpan = document.createElement("span");
       valTextSpan.setAttribute("class", "val-text");
@@ -527,6 +690,8 @@ class Cell {
    * @param {boolean} isClicked - if this cell was clicked
    */
   setOpen(isClicked = false) {
+    if (this.isFlagged) return;
+
     if (!this.isOpen) {
       this.setInnerText();
     }
@@ -544,10 +709,23 @@ class Cell {
       game.floodFillCells(this.row, this.col);
     }
 
-    if (game.checkWin()) {
+    if (game.checkWin() && isClicked) {
       game.onGameOver();
-      alert("You win! 🎉");
     }
+  }
+
+  /**
+   * Set the cell to "open", keeping it's value hidden.
+   */
+  open() {
+    this.ref.setAttribute("class", "cell open");
+  }
+
+  /**
+   * Set the cell to "closed"
+   */
+  close() {
+    this.ref.setAttribute("class", "cell closed");
   }
 
   /**
@@ -559,8 +737,6 @@ class Cell {
       "class",
       `cell open${isClicked ? " bomb-clicked" : ""}`
     );
-
-    console.debug(this.ref);
 
     // game over
     if (isClicked) {
@@ -574,7 +750,7 @@ class Cell {
   setInnerText() {
     const valTextSpan = document.createElement("span");
     valTextSpan.setAttribute("class", "val-text");
-    
+
     if (this.isMine) {
       valTextSpan.innerHTML = "💣";
     } else if (this.adjMineCount > 0) {
@@ -590,6 +766,9 @@ class Cell {
 
   setHandlers() {
     this.ref.addEventListener("mouseup", this.mouseUpHandler.bind(this));
+    this.ref.addEventListener("mousedown", this.mouseDownHandler.bind(this));
+    this.ref.addEventListener("mouseenter", this.mouseEnterHandler.bind(this));
+    this.ref.addEventListener("mouseleave", this.mouseLeaveHandler.bind(this));
     this.ref.addEventListener("contextmenu", this.contextMenuHandler);
   }
 
@@ -599,18 +778,31 @@ class Cell {
 
   /**
    * Handle mouse up event.
-   * @param {MouseEvent} e 
+   * @param {MouseEvent} e
    */
   mouseUpHandler(e) {
     e.preventDefault();
+
+    // set the face back to normal
+    game.timeRow.setFace("😀");
+
+    // if the game is not running, start it
+    if (e.button === 0 || e.button === 1 || e.button === 2) {
+      if (!game.isRunning) {
+        game.isRunning = true;
+        game.timeRow.startTimer();
+      }
+    }
+
     if (e.button === 2) {
       this.setFlag();
     }
 
     if (e.button === 1) {
+      game.closeNeighbors(this.row, this.col);
       game.openAdjacentCells(this.row, this.col);
     }
-    
+
     if (this.isFlagged) {
       return;
     }
@@ -620,12 +812,194 @@ class Cell {
     }
   }
 
+  mouseDownHandler(e) {
+    game.timeRow.setFace("😮");
+
+    if (e.button === 0 && !this.isOpen) {
+      this.open();
+    }
+
+    if (e.button === 1) {
+      if (!this.isOpen) {
+        this.open();
+      }
+      game.pressNeighbors(this.row, this.col);
+    }
+  }
+
+  mouseEnterHandler(e) {
+    e.preventDefault();
+    /**
+     * e.buttons values
+     * 0 - no buttons
+     * 1 - left button
+     * 2 - right button
+     * 4 - middle button
+     */
+
+    if (
+      (e.buttons === 1 || e.buttons === 4) &&
+      !this.isFlagged
+    ) {
+      if (!this.isOpen) {
+        this.open();
+      }
+      if (e.buttons === 4) {
+        game.pressNeighbors(this.row, this.col);
+      }
+    }
+  }
+
+  mouseLeaveHandler(e) {
+    e.preventDefault();
+
+    if (!this.isFlagged) {
+      if (!this.isOpen) {
+        this.close();
+      }
+
+      if (e.buttons === 4) {
+        game.closeNeighbors(this.row, this.col);
+      }
+    }
+  }
+
   /**
    * Handle when the right mouse button is clicked.
-   * @param {MouseEvent} e - The mouse event 
+   * @param {MouseEvent} e - The mouse event
    */
   contextMenuHandler(e) {
     e.preventDefault();
+  }
+}
+
+class TimeRow {
+  /** @type {HTMLDivElement} - Mines hundreds count */
+  mhRef;
+
+  /** @type {HTMLDivElement} - Mines tens count */
+  mtRef;
+
+  /** @type {HTMLDivElement} - Mines ones count */
+  moRef;
+
+  /** @type {HTMLDivElement} - Time hundreds count */
+  thRef;
+
+  /** @type {HTMLDivElement} - Time tens count */
+  ttRef;
+
+  /** @type {HTMLDivElement} - Time ones count */
+  toRef;
+
+  /** @type {HTMLDivElement} - Game control button count */
+  gbRef;
+
+  /** @type {number} - Game start time */
+  startTime;
+
+  /** @type {number} - Timer interval ID */
+  timerInterval;
+
+  constructor() {
+    this.mhRef = document.querySelector(".mines-hundreds");
+    this.mtRef = document.querySelector(".mines-tens");
+    this.moRef = document.querySelector(".mines-ones");
+    this.thRef = document.querySelector(".time-hundreds");
+    this.ttRef = document.querySelector(".time-tens");
+    this.toRef = document.querySelector(".time-ones");
+    this.gbRef = document.querySelector(".game-btn");
+
+    this.gbRef.addEventListener("click", (_) => {
+      this.restartGame();
+    });
+  }
+
+  /**
+   * Set the number of mines left.
+   * @param {number} num - The number of mines left. AKA the inverse of the number of flags.
+   */
+  setMines(num) {
+    this.mhRef.childNodes[0].innerHTML = Math.floor(num / 100);
+    this.mtRef.childNodes[0].innerHTML = Math.floor(num / 10) % 10;
+    this.moRef.childNodes[0].innerHTML = num % 10;
+  }
+
+  /**
+   * Get the current time in seconds.
+   * @returns {number} The current time in seconds, rounded down.
+   */
+  nowSeconds() {
+    return Math.floor(Date.now() / 1000);
+  }
+
+  /**
+   * Start the game's timer
+   */
+  startTimer() {
+    this.startTime = this.nowSeconds();
+    this.timerInterval = setInterval(() => {
+      const deltaTime = this.nowSeconds() - this.startTime;
+
+      // don't let the timer go over 999 seconds
+      if (deltaTime > 999) {
+        clearInterval(this.timerInterval);
+        return;
+      }
+
+      this.setTime(deltaTime);
+    }, 1000);
+  }
+
+  /**
+   * The number of seconds that have passed.
+   * @param {number} secs
+   */
+  setTime(secs) {
+    this.thRef.childNodes[0].innerHTML = Math.floor(secs / 100);
+    this.ttRef.childNodes[0].innerHTML = Math.floor(secs / 10) % 10;
+    this.toRef.childNodes[0].innerHTML = secs % 10;
+  }
+
+  setMH(num) {
+    this.mhRef.childNodes[0].innerHTML = num;
+  }
+
+  setMT(num) {
+    this.mtRef.childNodes[0].innerHTML = num;
+  }
+
+  setMO(num) {
+    this.moRef.childNodes[0].innerHTML = num;
+  }
+
+  setTH(num) {
+    this.thRef.childNodes[0].innerHTML = num;
+  }
+
+  setTT(num) {
+    this.ttRef.childNodes[0].innerHTML = num;
+  }
+
+  setTO(num) {
+    this.toRef.childNodes[0].innerHTML = num;
+  }
+
+  /**
+   *
+   * @param {'😀' | '😎' | '💀' | '😮'} face
+   */
+  setFace(face) {
+    this.gbRef.innerHTML = face;
+  }
+
+  /**
+   * Restart the game
+   */
+  restartGame() {
+    clearInterval(this.timerInterval);
+    setUIDifficulty();
+    this.setFace("😃");
   }
 }
 
